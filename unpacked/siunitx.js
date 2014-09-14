@@ -3,10 +3,9 @@
 
 /*************************************************************
  *
- *  MathJax/extensions/TeX/mhchem.js
+ *  MathJax/extensions/TeX/siunitx.js
  *  
- *  Implements the \ce command for handling chemical formulas
- *  from the mhchem LaTeX package.
+ *  Implements some of the features provided by the siunitx LaTeX package.
  *  
  *  ---------------------------------------------------------------------
  *  
@@ -74,7 +73,10 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     // atomic mass units 'amu' is missing!
   };
   
-  /* Add abbreviations */
+  /*
+   * I'm too lazy to write all of the abbreviations by hand now, so here it is
+   * programmatically.
+   */
   var AbbrevPfx = {
     a: 'atto',
     f: 'femto',
@@ -172,16 +174,15 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
   });
   
   /*
-   *  This is the main class for handing the \si and related commands.
-   *  Its main method is Parse() which takes the arguments to \si and
-   *  returns the corresponding TeX string.
+   * This is essentially a namespace for the various functions needed,
+   * such that TEX.Parse's namespace is not cluttered too much.
    */
   var SIunitx = MathJax.Object.Subclass({
     macro: "",    // the macro being used
     args: "",     // the macro arguments
     
     //
-    //  Store the string when a CE object is created
+    // Just store the name and arguments
     //
     Init: function (macro, args) {
       this.macro = macro.slice(1);
@@ -235,7 +236,7 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
   TEX.Parse.Augment({
 
     //
-    //  Implements \ce and friends
+    //  Implements \SI and friends
     //
     SIunitx: function (name, nargs) {
       var args = []
