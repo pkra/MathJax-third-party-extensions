@@ -43,6 +43,66 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     mole:     ['SIUnit', 'mol'],
     second:   ['SIUnit', 's'],
    
+    // Coherent derived units
+    bequerel: ['SIUnit', 'Bq'],
+    degreeCelsius: ['SIUnit', '\\degree C'],
+    coulomb: ['SIUnit', 'C'],
+    farad: ['SIUnit', 'F'],
+    gray: ['SIUnit', 'Gy'],
+    hertz: ['SIUnit', 'Hz'],
+    henry: ['SIUnit', 'H'],
+    joule: ['SIUnit', 'J'],
+    katal: ['SIUnit', 'kat'],
+    lumen: ['SIUnit', 'lm'],
+    lux: ['SIUnit', 'lx'],
+    newton: ['SIUnit', 'N'],
+    ohm: ['SIUnit', '\\Omega '],
+    pascal: ['SIUnit', 'pa'],
+    radian: ['SIUnit', 'rad'],
+    siemens: ['SIUnit', 'S'],
+    sievert: ['SIUnit', 'Sv'],
+    steradian: ['SIUnit', 'sr'],
+    tesla: ['SIUnit', 'T'],
+    volt: ['SIUnit', 'V'],
+    watt: ['SIUnit', 'W'],
+    weber: ['SIUnit', 'Wb'],
+
+    // accepted nun-SI units
+    day: ['SIUnit', 'd'],
+    degree: ['SIUnit', '\\circ '], // TODO: find proper symbol
+    hectare: ['SIUnit', 'ha'],
+    hour: ['SIUnit', 'h'],
+    litre: ['SIUnit', 'l'],
+    liter: ['SIUnit', 'L'],
+    arcminute: ['SIUnit', '\\prime '], // plane angle; TODO: find proper symbol
+    minute: ['SIUnit', 'min'],
+    arcsecond: ['SIUnit', '\\prime\\prime '], // plane angle; TODO: find proper symbol
+    tonne: ['SIUnit', 't'],
+    
+    // non-SI units whose values must be determined experimentally
+    astronomicalunit: ['SIUnit', 'ua'],
+    atomicmassunit: ['SIUnit', 'u'],
+    bohr: ['SIUnit', 'a_0'],
+    clight: ['SIUnit', 'c_0'],
+    dalton: ['SIUnit', 'Da'],
+    electronmass: ['SIUnit', 'm_e'],
+    electronvolt: ['SIUnit', 'eV'],
+    elementarycharge: ['SIUnit', 'e'],
+    hartree: ['SIUnit', 'E_h'],
+    planckbar: ['SIUnit', '\\hbar '],
+
+    // Other non-SI units
+    angstrom: ['SIUnit', '\\overcirc A'], // TODO: find propert symbol
+    bar: ['SIUnit', 'bar'],
+    barn: ['SIUnit', 'b'],
+    bel: ['SIUnit', 'B'],
+    decibel: ['SIUnit', 'dB'],
+    knot: ['SIUnit', 'kn'],
+    mmHg: ['SIUnit', 'mmHg'],
+    nauticmile: ['SIUnit', ';'],
+    neper: ['SIUnit', 'Np'],
+    
+
     // SI prefixes
     yocto: ['SIPrefix',-24,'y'],
     zepto: ['SIPrefix',-21,'z'],
@@ -70,8 +130,9 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     meter: ['Macro','\\metre'],
     
     // abbreviations
-    kg: ['Macro','\\kilogram']
-    // atomic mass units 'amu' is missing!
+    kg: ['Macro','\\kilogram'],
+    amu: ['Macro','\\atomicmassunit'],
+    kWh: ['Macro','\\kilo\\watt\\hour']
   };
   
   /*
@@ -106,7 +167,13 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     N: 'newton',
     Pa: 'pascal',
     ohm: 'ohm',
-    V: 'volt'
+    V: 'volt',
+    W: 'watt',
+    J: 'joule',
+    eV: 'electronvolt',
+    F: 'farad',
+    K: 'kelvin',
+    dB: 'decibel'
   };
   [
     "fg pg ng ug mg g",
@@ -119,7 +186,13 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     "mN N kN MN",
     "Pa kPa MPa GPa",
     "mohm kohm Mohm",
-    "pV nV uV mV V"
+    "pV nV uV mV V kV",
+    "uW mW W kW MW GW",
+    "J kJ",
+    "meV eV keV MeV GeV TeV",
+    "fF pF F",
+    "K",
+    "dB"    
   ].forEach(function(abbrset){abbrset.split(' ').forEach(function (abbrev){
     var unit = AbbrevUnits[abbrev];
     var repl = '';
@@ -202,7 +275,8 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     //  
     Parse: function (parser) {
       var macro = this['Parse_'+this.macro];
-      return macro.apply(this,[parser].concat(this.args));
+      macro.apply(this,[parser].concat(this.args));
+      console.log('result of parsing ',this.macro,this.args,'is',parser.stack.toString())
     },
     
     Parse_si: function (parser,units) {
@@ -223,7 +297,6 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     
     ParseUnits: function (parser,expr) {
       var mml = SIUnitParser(expr,parser.stack.env).mml();
-      console.log('Generated the following unit MathML:\n',mml.toMathML());
       return mml;
     }
     
