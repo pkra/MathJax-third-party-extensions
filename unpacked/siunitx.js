@@ -31,6 +31,7 @@ MathJax.Extension["TeX/siunitx"] = {
 MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
   
   var TEX = MathJax.InputJax.TeX;
+  var MML = MathJax.ElementJax.mml;
   
   var UNITSMACROS = {
     // SI base units
@@ -43,27 +44,27 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     second:   ['SIUnit', 's'],
    
     // SI prefixes
-    yocto: ['SIPrefix',-24],
-    zepto: ['SIPrefix',-21],
-    atto:  ['SIPrefix',-18],
-    femto: ['SIPrefix',-15],
-    pico:  ['SIPrefix',-12],
-    nano:  ['SIPrefix',-9],
-    micro: ['SIPrefix',-6],
-    milli: ['SIPrefix',-3],
-    centi: ['SIPrefix',-2],
-    deci:  ['SIPrefix',-1],
+    yocto: ['SIPrefix',-24,'y'],
+    zepto: ['SIPrefix',-21,'z'],
+    atto:  ['SIPrefix',-18,'a'],
+    femto: ['SIPrefix',-15,'f'],
+    pico:  ['SIPrefix',-12,'p'],
+    nano:  ['SIPrefix', -9,'n'],
+    micro: ['SIPrefix', -6,'\\mu '],
+    milli: ['SIPrefix', -3,'m'],
+    centi: ['SIPrefix', -2,'c'],
+    deci:  ['SIPrefix', -1,'d'],
 
-    deca:  ['SIPrefix',1],
-    hecto: ['SIPrefix',2],
-    kilo:  ['SIPrefix',3],
-    mega:  ['SIPrefix',6],
-    giga:  ['SIPrefix',9],
-    tera:  ['SIPrefix',12],
-    peta:  ['SIPrefix',15],
-    exa:   ['SIPrefix',18],
-    zetta: ['SIPrefix',21],
-    yotta: ['SIPrefix',24],
+    deca:  ['SIPrefix',  1],
+    hecto: ['SIPrefix',  2,'h'],
+    kilo:  ['SIPrefix',  3,'k'],
+    mega:  ['SIPrefix',  6,'M'],
+    giga:  ['SIPrefix',  9,'G'],
+    tera:  ['SIPrefix', 12,'T'],
+    peta:  ['SIPrefix', 15],
+    exa:   ['SIPrefix', 18],
+    zetta: ['SIPrefix', 21],
+    yotta: ['SIPrefix', 24],
     
     // aliases
     meter: ['Macro','\\metre'],
@@ -149,7 +150,8 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
   var SIUnitParser = TEX.Parse.Subclass({
     Init: function (string,env) {
       this.cur_prefix_power = 0;
-      arguments.callee.SUPER.Init.call(this,'\\mathrm '+string,env);
+      this.cur_prefix_symbol = undefined;
+      arguments.callee.SUPER.Init.call(this,string,env);
     },
 
     csFindMacro: function (name) {
@@ -159,17 +161,22 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
       return arguments.callee.SUPER.csFindMacro.call(this,name);
     },
     
-    SIPrefix: function (name, power) {
+    SIPrefix: function (name, power, pfx) {
+      console.log('SIPrefix ',name,power,pfx);
       if(this.cur_prefix_power){
         TEX.Error(["SIunitx","double SI prefix",this.cur_prefix_power,power]);
       }
       this.cur_prefix_power = power;
+      this.cur_prefix_symbol = pfx;
     },
     
     SIUnit: function (name, symbol) {
-      this.string = '{'+symbol+'}' + this.string.slice(this.i);
+      console.log('SIUnit ',name,symbol,this.cur_prefix_power,this.cur_prefix_symbol);
+      var pfx = this.cur_prefix_symbol || '';
+      this.string = '\\mathrm{'+pfx+symbol+'}' + this.string.slice(this.i);
       this.i = 0;
       this.cur_prefix_power = 0;
+      this.cur_prefix_symbol = undefined;
     }
   });
   
@@ -205,6 +212,7 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
 
     Parse_SI: function (parser,num,units) {
       parser.Push(this.ParseNumber(parser,num));
+      parser.Push(MML.mspace().With({width: MML.LENGTH.MEDIUMMATHSPACE, mathsize: MML.SIZE.NORMAL, scriptlevel:0}));
       parser.Push(this.ParseUnits(parser,units));
     },
     
@@ -214,7 +222,9 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     },
     
     ParseUnits: function (parser,expr) {
-      return SIUnitParser(expr,parser.stack.env).mml();
+      var mml = SIUnitParser(expr,parser.stack.env).mml();
+      console.log('Generated the following unit MathML:\n',mml.toMathML());
+      return mml;
     }
     
   });
