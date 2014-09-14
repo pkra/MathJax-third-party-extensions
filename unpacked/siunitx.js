@@ -31,7 +31,38 @@ MathJax.Extension["TeX/siunitx"] = {
 MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
   
   var TEX = MathJax.InputJax.TeX;
+  var TEXDEF = TEX.Definitions;
   var MML = MathJax.ElementJax.mml;
+
+  var SIPrefixes = [
+    ['yocto', -24,'y'],
+	['zepto', -21,'z'],
+    ['atto',  -18,'a'],
+    ['femto', -15,'f'],
+    ['pico',  -12,'p'],
+    ['nano',   -9,'n'],
+    ['micro',  -6,'\\mu '],
+    ['milli',  -3,'m'],
+    ['centi',  -2,'c'],
+    ['deci',   -1,'d'],
+
+    ['deca',    1],
+    ['hecto',   2,'h'],
+    ['kilo',    3,'k'],
+    ['mega',    6,'M'],
+    ['giga',    9,'G'],
+    ['tera',   12,'T'],
+    ['peta',   15],
+    ['exa',    18],
+    ['zetta',  21],
+    ['yotta',  24]
+  ].map(function(data){
+	return {
+		name: data[0],
+		power: data[1],
+		symbol: data[2]
+	};
+  });
   
   var UNITSMACROS = {
     // SI base units
@@ -102,30 +133,6 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     nauticmile: ['SIUnit', ';'],
     neper: ['SIUnit', 'Np'],
     
-
-    // SI prefixes
-    yocto: ['SIPrefix',-24,'y'],
-    zepto: ['SIPrefix',-21,'z'],
-    atto:  ['SIPrefix',-18,'a'],
-    femto: ['SIPrefix',-15,'f'],
-    pico:  ['SIPrefix',-12,'p'],
-    nano:  ['SIPrefix', -9,'n'],
-    micro: ['SIPrefix', -6,'\\mu '],
-    milli: ['SIPrefix', -3,'m'],
-    centi: ['SIPrefix', -2,'c'],
-    deci:  ['SIPrefix', -1,'d'],
-
-    deca:  ['SIPrefix',  1],
-    hecto: ['SIPrefix',  2,'h'],
-    kilo:  ['SIPrefix',  3,'k'],
-    mega:  ['SIPrefix',  6,'M'],
-    giga:  ['SIPrefix',  9,'G'],
-    tera:  ['SIPrefix', 12,'T'],
-    peta:  ['SIPrefix', 15],
-    exa:   ['SIPrefix', 18],
-    zetta: ['SIPrefix', 21],
-    yotta: ['SIPrefix', 24],
-    
     // aliases
     meter: ['Macro','\\metre'],
     
@@ -134,6 +141,10 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     amu: ['Macro','\\atomicmassunit'],
     kWh: ['Macro','\\kilo\\watt\\hour']
   };
+  
+  SIPrefixes.forEach(function(pfx){
+	UNITSMACROS[pfx.name] = ['SIPrefix', pfx];
+  });
   
   /*
    * I'm too lazy to write all of the abbreviations by hand now, so here it is
@@ -222,11 +233,22 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
    */
   var SIUnitParser = TEX.Parse.Subclass({
     Init: function (string,env) {
-      this.cur_prefix_power = 0;
-      this.cur_prefix_symbol = undefined;
+      this.cur_prefix = undefined;
+	  this.has_literal = false; // Set to true if non-siunitx LaTeX is encountered in input
+	  this.units = [];
       arguments.callee.SUPER.Init.call(this,string,env);
+	  if(this.has_literal){
+		console.log('Unit "',string,'" was parsed literally ',this.units);
+	  } else {
+		console.log('Unit "',string,'" was parsed as these units: ',this.units);
+	  }
     },
 
+	// This is used to identify non-siunitx LaTeX in the input
+    Push: function () { this.has_literal=true; this.stack.Push.apply(this.stack,arguments);},
+	// While literal fall-back output from proper unit macros use this path
+	PushUnitFallBack: function() {this.stack.Push.apply(this.stack,arguments);},
+	
     csFindMacro: function (name) {
       var macro = UNITSMACROS[name];
       if( macro ) return macro;
@@ -234,24 +256,34 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
       return arguments.callee.SUPER.csFindMacro.call(this,name);
     },
     
-    SIPrefix: function (name, power, pfx) {
-      console.log('SIPrefix ',name,power,pfx);
-      if(this.cur_prefix_power){
-        TEX.Error(["SIunitx","double SI prefix",this.cur_prefix_power,power]);
+    SIPrefix: function (name, pfx) {
+      console.log('SIPrefix ',name,pfx);
+      if(this.cur_prefix){
+        TEX.Error(["SIunitx","double SI prefix",this.cur_prefix,pfx]);
       }
-      this.cur_prefix_power = power;
-      this.cur_prefix_symbol = pfx;
+      this.cur_prefix = pfx;
     },
     
     SIUnit: function (name, symbol) {
-      console.log('SIUnit ',name,symbol,this.cur_prefix_power,this.cur_prefix_symbol);
-      var pfx = this.cur_prefix_symbol || '';
+      console.log('SIUnit ',name,symbol,this.cur_prefix);
+
+	  // Add to units
+	  this.units.push({
+		unit: name,
+		symbol: symbol,
+		prefix: this.cur_prefix
+	  });
+	
+	  // And process fall-back
+      var pfx = this.cur_prefix.symbol || '';
+	  // TODO: parse using PushUnitFallBack
       this.string = '\\mathrm{'+pfx+symbol+'}' + this.string.slice(this.i);
       this.i = 0;
-      this.cur_prefix_power = 0;
-      this.cur_prefix_symbol = undefined;
+
+      this.cur_prefix = undefined;
     }
   });
+  MathJax.Extension["TeX/siunitx"].SIUnitParser = SIUnitParser;
   
   /*
    * This is essentially a namespace for the various functions needed,
