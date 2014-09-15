@@ -41,7 +41,7 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     ['femto', -15,'f'],
     ['pico',  -12,'p'],
     ['nano',   -9,'n'],
-    ['micro',  -6,'\\mu '],
+    ['micro',  -6,MML.entity("#x03bc")],
     ['milli',  -3,'m'],
     ['centi',  -2,'c'],
     ['deci',   -1,'d'],
@@ -76,7 +76,7 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
    
     // Coherent derived units
     bequerel: ['SIUnit', 'Bq'],
-    degreeCelsius: ['SIUnit', '\\degree C'],
+    degreeCelsius: ['SIUnit', MML.entity("#x2103")],
     coulomb: ['SIUnit', 'C'],
     farad: ['SIUnit', 'F'],
     gray: ['SIUnit', 'Gy'],
@@ -87,7 +87,7 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     lumen: ['SIUnit', 'lm'],
     lux: ['SIUnit', 'lx'],
     newton: ['SIUnit', 'N'],
-    ohm: ['SIUnit', '\\Omega '],
+    ohm: ['SIUnit', MML.entity("#x03a9")],
     pascal: ['SIUnit', 'pa'],
     radian: ['SIUnit', 'rad'],
     siemens: ['SIUnit', 'S'],
@@ -100,14 +100,14 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
 
     // accepted nun-SI units
     day: ['SIUnit', 'd'],
-    degree: ['SIUnit', '\\circ '], // TODO: find proper symbol
+    degree: ['SIUnit', MML.entity("#x00b0")],
     hectare: ['SIUnit', 'ha'],
     hour: ['SIUnit', 'h'],
     litre: ['SIUnit', 'l'],
     liter: ['SIUnit', 'L'],
-    arcminute: ['SIUnit', '\\prime '], // plane angle; TODO: find proper symbol
+    arcminute: ['SIUnit', MML.entity("#x2032")], // plane angle;
     minute: ['SIUnit', 'min'],
-    arcsecond: ['SIUnit', '\\prime\\prime '], // plane angle; TODO: find proper symbol
+    arcsecond: ['SIUnit', MML.entity("#x2033")], // plane angle;
     tonne: ['SIUnit', 't'],
     
     // non-SI units whose values must be determined experimentally
@@ -123,7 +123,7 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
     planckbar: ['SIUnit', '\\hbar '],
 
     // Other non-SI units
-    angstrom: ['SIUnit', '\\overcirc A'], // TODO: find propert symbol
+    angstrom: ['SIUnit', MML.entity("#x212b")],
     bar: ['SIUnit', 'bar'],
     barn: ['SIUnit', 'b'],
     bel: ['SIUnit', 'B'],
@@ -275,11 +275,30 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready",function () {
 	  });
 	
 	  // And process fall-back
-      var pfx = this.cur_prefix.symbol || '';
-	  // TODO: parse using PushUnitFallBack
-      this.string = '\\mathrm{'+pfx+symbol+'}' + this.string.slice(this.i);
-      this.i = 0;
-
+      var parts = [];
+      if(this.cur_prefix)
+        parts = parts.concat(this.cur_prefix.symbol);
+      parts = parts.concat(symbol);
+      var curstring = '';
+      var content = [];
+      parts.forEach(function (p){
+        if(typeof p == 'string' || p instanceof String){
+          curstring += p;
+        } else {
+          if(curstring){
+            content.push(MML.chars(curstring));
+            curstring = '';
+          }
+          content.push(p);
+        }
+      });
+      if(curstring)
+        content.push(MML.chars(curstring));
+      console.log('parts   is ',parts);
+      console.log('content is ',content);
+      var def = {mathvariant: MML.VARIANT.NORMAL};
+      this.PushUnitFallBack(this.mmlToken(MML.mi.apply(MML.mi,content).With(def)));
+        
       this.cur_prefix = undefined;
     }
   });
