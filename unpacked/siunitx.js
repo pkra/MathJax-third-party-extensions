@@ -32,16 +32,37 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready", function () {
   
   var TEX = MathJax.InputJax.TeX;
   var TEXDEF = TEX.Definitions;
+  var STACK = TEX.Stack;
+  var STACKITEM = STACK.Item;
   var MML = MathJax.ElementJax.mml;
 
   var UNITSMACROS = {
+    // special units
+    percent: {name:'percent',symbol:'%',category:'non-unit'},
+      
+    // powers
+    per: ['Per',-1],
+    square: ['PowerPfx',2],
+    cubic: ['PowerPfx',3],
+    raiseto: ['PowerPfx',undefined],
+    squared: ['PowerSfx',2],
+    cubed: ['PowerSfx',3],
+    tothe: ['PowerSfx',undefined],
+      
     // aliases
     meter: ['Macro','\\metre'],
+    deka: ['Macro','\\deca'],
     
     // abbreviations
+    celsius: ['Macro','\\degreeCelsius'],
     kg: ['Macro','\\kilogram'],
     amu: ['Macro','\\atomicmassunit'],
-    kWh: ['Macro','\\kilo\\watt\\hour']
+    kWh: ['Macro','\\kilo\\watt\\hour'],
+      
+    // not yet supported:
+    of: 'Unsupported',
+    cancel: 'Unsupported',
+    highlight: 'Unsupported'
   };
 
   // ******* SI prefixes *******************
@@ -114,12 +135,13 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready", function () {
     ampere:   ['A','A'],
     candela:  ['cd'],
     kelvin:   ['K','K'],
-    kilogram: ['kg','kg'],
+    kilogram: ['kg'],
+    gram:     ['g','g'],
     metre:    ['m','m'],
     mole:     ['mol','mol'],
     second:   ['s','s']
   }),_BuildUnits('coherent derived',{
-    bequerel: ['Bq'],
+    becquerel: ['Bq'],
     degreeCelsius: [MML.entity("#x2103")],
     coulomb: ['C'],
     farad: ['F','F'],
@@ -253,18 +275,46 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready", function () {
   var SIUnitParser = TEX.Parse.Subclass({
     Init: function (string,env) {
       this.cur_prefix = undefined;
+      this.cur_pfxpow = undefined;
+      this.per_active = false;
 	  this.has_literal = false; // Set to true if non-siunitx LaTeX is encountered in input
 	  this.units = [];
       arguments.callee.SUPER.Init.call(this,string,env);
-	  if(this.has_literal){
+/*	  if(this.has_literal){
 		console.log('Unit "',string,'" was parsed literally ',this.units);
 	  } else {
 		console.log('Unit "',string,'" was parsed as these units: ',this.units);
-	  }
+	  }*/
     },
 
+    mml: function () {
+      if(!this.has_literal){
+        // no literal, all information in this.units
+        // => generate fresh MML here
+        var stack = TEX.Stack({},true);
+		var mythis = this;
+        this.units.forEach(function(u){
+            stack.Push(mythis.UnitMML(u));
+        });          
+        stack.Push(STACKITEM.stop());
+        if (stack.Top().type !== "mml") {return null}
+        return stack.Top().data[0];
+      }
+      if (this.stack.Top().type !== "mml") {return null}
+      return this.stack.Top().data[0];
+    },      
+      
 	// This is used to identify non-siunitx LaTeX in the input
-    Push: function () { this.has_literal=true; this.stack.Push.apply(this.stack,arguments);},
+    Push: function () {
+        for(var idx=0;idx<arguments.length;idx++){
+            var arg = arguments[idx];
+            if(!(arg instanceof STACKITEM.stop)){
+                console.log('litera linput ',arg);
+                this.has_literal=true;
+            }
+            this.stack.Push.call(this.stack,arg);
+        }
+    },
 	// While literal fall-back output from proper unit macros use this path
 	PushUnitFallBack: function() {this.stack.Push.apply(this.stack,arguments);},
 	
@@ -275,21 +325,89 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready", function () {
       return arguments.callee.SUPER.csFindMacro.call(this,name);
     },
     
+    Per: function(name){
+      if(this.per_active){
+        TEX.Error(["SIunitx","double \\per"]);
+        return;
+      }
+      this.per_active = true;
+    },
+      
+    PowerPfx: function(name, pow) {
+      if(pow === undefined){
+        pow = this.GetArgument(name);
+      }
+      if(this.cur_pfxpow){
+        TEX.Error(["SIunitx","double power prefix",this.cur_pfxpow,pow]);
+        return;
+      }
+      this.cur_pfxpow = pow;
+    },
+    
+    PowerSfx: function(name, pow) {
+      if(pow === undefined){
+        pow = this.GetArgument(name);
+      }
+      if(this.has_literal){
+        // unit is already gone, best we can do is add a superscript
+        TEX.Error(["SIunitx","NotImplementedYet"]);
+        return;
+      }
+      if(!this.units.length){
+        TEX.Error(["SIunitx","Power suffix with no unit"]);
+        return;
+      }
+      var unit = this.units[this.units.length-1];
+      if(unit.power !== undefined){
+        TEX.Error(["SIunitx","double power",unit.power,pow]);
+        return;
+      }
+      unit.power = pow;
+    },
+      
     SIPrefix: function (name, pfx) {
-      console.log('SIPrefix ',name,pfx);
       if(this.cur_prefix){
         TEX.Error(["SIunitx","double SI prefix",this.cur_prefix,pfx]);
       }
       this.cur_prefix = pfx;
     },
     
+    UnitMML: function(unit) {
+      var parts = [];
+      if(unit.prefix)
+        parts = parts.concat(unit.prefix.pfx);
+      parts = parts.concat(unit.unit.symbol);
+      var curstring = '';
+      var content = [];
+      parts.forEach(function (p){
+        if(typeof p == 'string' || p instanceof String){
+          curstring += p;
+        } else {
+          if(curstring){
+            content.push(MML.chars(curstring));
+            curstring = '';
+          }
+          content.push(p);
+        }
+      });
+      if(curstring)
+        content.push(MML.chars(curstring));
+      var def = {mathvariant: MML.VARIANT.NORMAL};
+      var mml = MML.mi.apply(MML.mi,content).With(def)
+      var power = unit.power === undefined ? 1 : unit.power;
+      if(unit.inverse) power = -power;
+      if(power != 1)
+          mml = MML.msup(mml,MML.mn(power));
+      return this.mmlToken(mml);
+    },
+      
     SIUnit: function (name, unit) {
-      console.log('SIUnit ',name,unit,this.cur_prefix);
-
 	  // Add to units
 	  this.units.push({
 		unit: unit,
-		prefix: this.cur_prefix
+		prefix: this.cur_prefix,
+        power: this.cur_pfxpow,
+        inverse: this.per_active
 	  });
 	
 	  // And process fall-back
@@ -312,12 +430,12 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready", function () {
       });
       if(curstring)
         content.push(MML.chars(curstring));
-      console.log('parts   is ',parts);
-      console.log('content is ',content);
       var def = {mathvariant: MML.VARIANT.NORMAL};
       this.PushUnitFallBack(this.mmlToken(MML.mi.apply(MML.mi,content).With(def)));
         
       this.cur_prefix = undefined;
+      this.cur_pfxpow = undefined;
+      this.per_active = false; // TODO: implement sticky per
     }
   });
   MathJax.Extension["TeX/siunitx"].SIUnitParser = SIUnitParser;
@@ -326,51 +444,38 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready", function () {
    * This is essentially a namespace for the various functions needed,
    * such that TEX.Parse's namespace is not cluttered too much.
    */
-  var SIunitx = MathJax.Object.Subclass({
-    macro: "",    // the macro being used
-    args: "",     // the macro arguments
-    
-    //
-    // Just store the name and arguments
-    //
-    Init: function (macro, args) {
-      this.macro = macro.slice(1);
-      this.args = args;
+  var SIunitxParsers = {
+    si: function (name) {
+      var options = this.GetBrackets(name,'');
+      var units = this.GetArgument(name);
+//      console.log('>> si(',name,'){',units,'}');
+      this.Push(SIUnitParser(units,this.stack.env).mml());
     },
 
-    //
-    // Main entry point to the SIunitx namespace.
-    // Calls the appropriate macro handler
-    //  
-    Parse: function (parser) {
-      var macro = this['Parse_'+this.macro];
-      macro.apply(this,[parser].concat(this.args));
-      console.log('result of parsing ',this.macro,this.args,'is',parser.stack.toString())
-    },
-    
-    Parse_si: function (parser,units) {
-      parser.Push(this.ParseUnits(parser,units));
-    },
-
-
-    Parse_SI: function (parser,num,units) {
-      parser.Push(this.ParseNumber(parser,num));
-      parser.Push(MML.mspace().With({width: MML.LENGTH.MEDIUMMATHSPACE, mathsize: MML.SIZE.NORMAL, scriptlevel:0}));
-      parser.Push(this.ParseUnits(parser,units));
-    },
-    
-    //
-    ParseNumber: function (parser,expr) {
-      return TEX.Parse(expr,parser.stack.env).mml();
-    },
-    
-    ParseUnits: function (parser,expr) {
-      var mml = SIUnitParser(expr,parser.stack.env).mml();
-      return mml;
+    SI: function (name) {
+      var options = this.GetBrackets(name,'');
+      var num = this.GetArgument(name);
+      var preunits = this.GetBrackets(name,'');
+      var units = this.GetArgument(name);
+ //     console.log('>> SI(',name,'){',num,'}{',units,'}');
+      if(preunits){
+        this.Push(SIUnitParser(preunits,this.stack.env).mml());
+        this.Push(MML.mspace().With({
+          width: MML.LENGTH.MEDIUMMATHSPACE,
+          mathsize: MML.SIZE.NORMAL,
+          scriptlevel:0
+        }));
+      }
+      this.Push(TEX.Parse(num,this.stack.env).mml());
+      this.Push(MML.mspace().With({
+        width: MML.LENGTH.MEDIUMMATHSPACE,
+        mathsize: MML.SIZE.NORMAL,
+        scriptlevel:0
+      }));
+      this.Push(SIUnitParser(units,this.stack.env).mml());
     }
-    
-  });
-  MathJax.Extension["TeX/siunitx"].SIunitx = SIunitx;
+  };
+  MathJax.Extension["TeX/siunitx"].SIunitxParsers = SIunitxParsers;
   
   
   /***************************************************************************/
@@ -380,8 +485,8 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready", function () {
       //
       //  Set up the macros for SI units
       //
-      SI:   ['SIunitx',2],
-      si:   ['SIunitx',1]
+      SI:   'SIunitx',
+      si:   'SIunitx',
     }
   },null,true);
     
@@ -390,13 +495,8 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready", function () {
     //
     //  Implements \SI and friends
     //
-    SIunitx: function (name, nargs) {
-      var args = []
-      for(;nargs>0;nargs--)
-        args.push(this.GetArgument(name));
-      console.log(' got SIunitx ',name,args,nargs);
-      var SI = SIunitx(name,args);
-      SI.Parse(this);
+    SIunitx: function (name) {
+      SIunitxParsers[name.slice(1)].call(this,name)
     }
     
   });
