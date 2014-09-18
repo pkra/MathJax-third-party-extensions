@@ -36,6 +36,130 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready", function () {
   var STACKITEM = STACK.Item;
   var MML = MathJax.ElementJax.mml;
 
+  var ValidationError = MathJax.Object.Subclass({
+    Init: function(obj,name,validator,val){
+      this._errormsg = 'ValidationError: Error validating '+name+' of '+obj+' (a '+validator+') to '+val+': '
+      for(var idx=4;idx<arguments.length;++idx)
+        this._errormsg += arguments[idx].toString();
+      console.log(this._errormsg);
+    },
+    toString: function(){
+      return this._errormsg;
+    }
+  });
+
+  var ValidationBase = MathJax.Object.Subclass({
+    PropertyDescriptor: function(cls,propname){
+      var descriptor = this;
+      console.log('create property ',propname,' of ',cls,' (type ',descriptor,')');
+      return {
+        get: function(){
+          var ret = this._values[propname];
+          console.log('get property ',propname,' of ',this,cls,' (type ',descriptor,'): ',ret,descriptor._default);
+          if(ret !== undefined)
+            return ret;
+          return descriptor._default;
+        },
+        set: function(val){
+          console.log('set property ',propname,' of ',this,cls,' (type ',descriptor,') to ',val);
+          this._values[propname] = descriptor.Validate(val,propname,this);
+        }
+      };
+    }
+  });
+  
+  var Choice = ValidationBase.Subclass({
+    Init: function(){
+      this._default = arguments[0];
+      var choices = {};
+      for(var idx=0;idx<arguments.length;idx++)
+        choices[arguments[idx]] = true;
+      this._choices = choices;
+    },
+    Validate: function(val,name,obj){
+      if(!this._choices.hasOwnProperty(val))
+        throw ValidationError(
+          obj,name,this,val,
+          'must be one of ["'
+          +Object.getOwnPropertyNames(this._choices).join('", "')
+          +'"]'
+        );
+      return val;
+    }
+  });
+  var Integer = ValidationBase.Subclass({
+    Init: function(def){this._default = def;},
+    Validate: function(val,name,obj){
+      if(!Number.isInteger(val))
+        throw ValidationError(obj,name,this,val,"must be an integer");
+      return +val;
+    }
+  });
+  var Literal = ValidationBase.Subclass({
+    Init: function(def){this._default = def;},
+    Validate: function(val,name,obj){
+      return val;
+    }
+  });
+  var Switch = ValidationBase.Subclass({
+    Init: function(def){
+      if(def === undefined)
+        def = false;
+      this._default = def;
+    },
+    Validate: function(val,name,obj){
+      if(val === undefined) val=true;
+      if(val !== true && val !== false)
+        throw ValidationError(obj,name,this,val,"must be a boolean");
+      return val;
+    }
+  });
+  
+  var ConfigData = MathJax.Object.Subclass({
+    Init: function(values){
+      this._values = {}
+      if(values != undefined)
+        SetMany(values);
+    },
+    Set: function(prop,value){
+      if(this._options[prop] === undefined)
+        throw ValidationError(this,name,undefined,values[prop],"does not exist");
+      this[prop] = value;
+    }
+    SetMany: function(values){
+      for(var prop in values)
+        this.Set(prop,values[prop]);
+    },
+    Derived: function(values){
+      var ret = this.constructor();
+      ret._values.__proto__ = this._values.__proto__;
+      if(values != undefined){
+        ret.SetMany(values);
+      }
+      return ret;
+    },
+    toString: function(){
+      var ret = []
+      for(var prop in this._options)
+        ret.push(prop + ' = ' + this[prop]);
+      return ret.join(',\n');
+    }
+  },{
+    Define: function(definition){
+      var ret = this.Subclass({_options:definition});
+      for(var prop in definition){
+        Object.defineProperty(ret.prototype,prop,definition[prop].PropertyDescriptor(ret,prop));
+      }
+      return ret;
+    }
+  });
+  
+  var SIunitxOptions = ConfigData.Define({
+    'detect-family': Switch(),
+    'detect-inline-family': Choice('text','math'),
+    'detect-inline-weight': Choice('text','math'),
+  });
+      
   var UNITSMACROS = {
     // special units
     percent: {name:'percent',symbol:'%',category:'non-unit'},
@@ -339,7 +463,6 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready", function () {
       }
       if(this.cur_pfxpow){
         TEX.Error(["SIunitx","double power prefix",this.cur_pfxpow,pow]);
-        return;
       }
       this.cur_pfxpow = pow;
     },
@@ -351,16 +474,13 @@ MathJax.Hub.Register.StartupHook("TeX Jax Ready", function () {
       if(this.has_literal){
         // unit is already gone, best we can do is add a superscript
         TEX.Error(["SIunitx","NotImplementedYet"]);
-        return;
       }
       if(!this.units.length){
         TEX.Error(["SIunitx","Power suffix with no unit"]);
-        return;
       }
       var unit = this.units[this.units.length-1];
       if(unit.power !== undefined){
         TEX.Error(["SIunitx","double power",unit.power,pow]);
-        return;
       }
       unit.power = pow;
     },
