@@ -16,9 +16,31 @@ To add an extension, simply create a pull request. Please structure your contrib
 * Preferably, contribute both a packed (using uglify, YUI etc) as well as an unpacked version; the unpacked version should be placed under `foldername/unpacked/` with a working `loadComplete` call.
 
 
-## How-to
+## Using third party extensions.
 
-**TODO** add links to documentation on extension writing. 
+We host  copy of the third-party extension repository on the MathJax CDN. This means anything you contribute here will be easily available to all MathJax CDN users.
 
-In the mean time, check out the extensions here and the core extension in http://github.com/mathjax/mathjax/unpacked/extensions
 
+To add the third party repository to your configuration use
+
+    <script type="text/x-mathjax-config">
+      MathJax.Ajax.config.path["Contrib"] = "//cdn.mathjax.org/mathjax/contrib";
+    </script>
+
+or equivalently,
+
+    <script type="text/javascript">
+      window.MathJax = {
+        AuthorInit: function () {
+                MathJax.Ajax.config.path["Contrib"] = "//cdn.mathjax.org/mathjax/contrib";
+            }
+      };
+    </script>
+
+in your configuration. See also the [documentation page on third party extensions and this repository](http://docs.mathjax.org/en/latest/options/ThirdParty.html#mathjax-third-party-extension-repository).
+
+## Writing extensions
+
+The MathJax documentation [contains a tutorial on extension writing](http://docs.mathjax.org/en/latest/extension-writing.html).
+
+Afterwards, you might want to start by looking at some of the extensions here and [the MathJax core extensions](http://github.com/mathjax/mathjax/unpacked/extensions).
