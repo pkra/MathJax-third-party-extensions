@@ -14,7 +14,7 @@ References:
 
 ### Using the MathJax CDN {#CDN}
 
-The MathJax CDN hosts a copy of this extension via the [MathJax third party extension repository](https://github.com/mathjax/MathJax-third-party-extensions). To use the CDN copy, you need MathJax v2.4 (or higher) and configure the third party extension repository as described in the [MathJax documentation](http://docs.mathjax.org/). 
+The MathJax CDN hosts a copy of this extension via the [MathJax third party extension repository](https://github.com/mathjax/MathJax-third-party-extensions). To use the CDN copy, you need MathJax v2.4 (or higher) and configure the third party extension repository as described in the [MathJax documentation](http://docs.mathjax.org/).
 
 Then add the extension to your configuration like any other third party extension from the MathJax CDN. For example, your inline configuration might be
 
@@ -23,7 +23,7 @@ Then add the extension to your configuration like any other third party extensio
        extensions: ["tex2jax.js","[Contrib]/siunitx/siunitx.js"],
        jax: ["input/TeX","output/HTML-CSS"],
        tex2jax: {inlineMath: [["$","$"],["\\(","\\)"]]},
-       TeX: {extensions: ["AMSmath.js","AMSsymbols.js"]}
+       TeX: {extensions: ["AMSmath.js","AMSsymbols.js", "[Contrib]/siunitx/siunitx.js"]}
      });
      </script>
 
